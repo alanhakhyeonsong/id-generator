@@ -76,6 +76,7 @@ echo ""
 echo "[3/4] Docker 이미지 빌드..."
 cd "$PROJECT_ROOT"
 docker build \
+  --platform linux/amd64 \
   -f infrastructure/Dockerfile \
   -t "$FULL_IMAGE" \
   -t "$LATEST_IMAGE" \

@@ -23,6 +23,8 @@ data:
 
   sentinel.conf: |
     port 26379
+    sentinel resolve-hostnames yes
+    sentinel announce-hostnames yes
     sentinel monitor mymaster valkey-master.ramos-id-generator-test.svc.cluster.local 6379 2
     sentinel auth-pass mymaster testpass
     sentinel down-after-milliseconds mymaster 5000
