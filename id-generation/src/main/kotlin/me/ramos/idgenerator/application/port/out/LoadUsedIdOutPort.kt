@@ -9,6 +9,5 @@ import me.ramos.idgenerator.adapter.out.persistence.entity.UsedIdJpaEntity
  */
 interface LoadUsedIdOutPort {
     fun findByType(type: String): UsedIdJpaEntity?
-    fun findByTypeWithLock(type: String): UsedIdJpaEntity?
     fun isIdGenerationRequired(type: String): Boolean
 }

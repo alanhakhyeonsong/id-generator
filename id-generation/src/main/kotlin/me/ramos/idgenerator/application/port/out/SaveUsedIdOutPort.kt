@@ -9,6 +9,6 @@ import me.ramos.idgenerator.adapter.out.persistence.entity.UsedIdJpaEntity
  */
 interface SaveUsedIdOutPort {
     fun save(entity: UsedIdJpaEntity): UsedIdJpaEntity
-    fun updateSequence(type: String, currentSeq: Long, count: Long): Int
-    fun advanceToNextRange(type: String, seqIncrement: Long, endSeq: Long): Int
+    fun updateSequence(type: String, currentSeq: Long, count: Long): Long
+    fun advanceToNextRange(type: String, seqIncrement: Long, endSeq: Long): Long
 }

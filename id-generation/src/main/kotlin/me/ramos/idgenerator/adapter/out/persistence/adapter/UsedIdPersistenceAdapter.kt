@@ -16,9 +16,6 @@ class UsedIdPersistenceAdapter(
     override fun findByType(type: String): UsedIdJpaEntity? =
         usedIdRepository.findByType(type)
 
-    override fun findByTypeWithLock(type: String): UsedIdJpaEntity? =
-        usedIdRepository.findByTypeWithLock(type)
-
     override fun isIdGenerationRequired(type: String): Boolean =
         usedIdRepository.isIdGenerationRequired(type)
 
@@ -27,10 +24,10 @@ class UsedIdPersistenceAdapter(
         usedIdRepository.save(entity)
 
     @Transactional
-    override fun updateSequence(type: String, currentSeq: Long, count: Long): Int =
+    override fun updateSequence(type: String, currentSeq: Long, count: Long): Long =
         usedIdRepository.updateSequence(type, currentSeq, count)
 
     @Transactional
-    override fun advanceToNextRange(type: String, seqIncrement: Long, endSeq: Long): Int =
+    override fun advanceToNextRange(type: String, seqIncrement: Long, endSeq: Long): Long =
         usedIdRepository.advanceToNextRange(type, seqIncrement, endSeq)
 }
