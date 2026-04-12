@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: valkey-sentinel
+  namespace: ramos-id-generator-test
+  labels:
+    app.kubernetes.io/name: valkey
+    app.kubernetes.io/component: sentinel
+    app.kubernetes.io/part-of: valkey-sentinel
+spec:
+  type: ClusterIP
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: valkey
+    app.kubernetes.io/component: sentinel
+  ports:
+    - name: sentinel
+      port: 26379
+      targetPort: 26379
+      protocol: TCP
