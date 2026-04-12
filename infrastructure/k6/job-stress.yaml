@@ -1,0 +1,39 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: k6-stress
+  namespace: ramos-id-generator-test
+  labels:
+    app.kubernetes.io/part-of: k6-load-test
+    app.kubernetes.io/component: stress
+spec:
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/part-of: k6-load-test
+        app.kubernetes.io/component: stress
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: k6
+          image: grafana/k6:latest
+          command:
+            - k6
+            - run
+            - /scripts/stress.js
+          volumeMounts:
+            - name: scripts
+              mountPath: /scripts
+              readOnly: true
+          resources:
+            requests:
+              cpu: 500m
+              memory: 256Mi
+            limits:
+              cpu: 1000m
+              memory: 512Mi
+      volumes:
+        - name: scripts
+          configMap:
+            name: k6-scripts

@@ -1,0 +1,81 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: valkey-sentinel
+  namespace: ramos-id-generator-test
+  labels:
+    app.kubernetes.io/name: valkey
+    app.kubernetes.io/component: sentinel
+    app.kubernetes.io/part-of: valkey-sentinel
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: valkey
+      app.kubernetes.io/component: sentinel
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: valkey
+        app.kubernetes.io/component: sentinel
+        app.kubernetes.io/part-of: valkey-sentinel
+    spec:
+      initContainers:
+        - name: copy-config
+          image: valkey/valkey:7
+          command:
+            - sh
+            - -c
+            - cp /etc/valkey-ro/sentinel.conf /etc/valkey/sentinel.conf
+          volumeMounts:
+            - name: config-ro
+              mountPath: /etc/valkey-ro
+              readOnly: true
+            - name: config
+              mountPath: /etc/valkey
+      containers:
+        - name: sentinel
+          image: valkey/valkey:7
+          ports:
+            - containerPort: 26379
+              name: sentinel
+          command:
+            - valkey-sentinel
+            - /etc/valkey/sentinel.conf
+          volumeMounts:
+            - name: config
+              mountPath: /etc/valkey
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
+          readinessProbe:
+            exec:
+              command:
+                - valkey-cli
+                - -p
+                - "26379"
+                - ping
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command:
+                - valkey-cli
+                - -p
+                - "26379"
+                - ping
+            initialDelaySeconds: 15
+            periodSeconds: 20
+      volumes:
+        - name: config-ro
+          configMap:
+            name: valkey-config
+            items:
+              - key: sentinel.conf
+                path: sentinel.conf
+        - name: config
+          emptyDir: {}

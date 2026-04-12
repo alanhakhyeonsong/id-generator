@@ -44,3 +44,6 @@ out/
 
 .omc
 docs/plans
+
+### Infrastructure secrets ###
+infrastructure/scripts/.env

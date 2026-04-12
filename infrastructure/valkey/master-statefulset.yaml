@@ -1,0 +1,80 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: valkey-master
+  namespace: ramos-id-generator-test
+  labels:
+    app.kubernetes.io/name: valkey
+    app.kubernetes.io/component: master
+    app.kubernetes.io/part-of: valkey-sentinel
+spec:
+  serviceName: valkey-master
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: valkey
+      app.kubernetes.io/component: master
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: valkey
+        app.kubernetes.io/component: master
+        app.kubernetes.io/part-of: valkey-sentinel
+    spec:
+      containers:
+        - name: valkey
+          image: valkey/valkey:7
+          ports:
+            - containerPort: 6379
+              name: valkey
+          command:
+            - valkey-server
+            - /etc/valkey/master.conf
+          volumeMounts:
+            - name: config
+              mountPath: /etc/valkey
+              readOnly: true
+            - name: data
+              mountPath: /data
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+          readinessProbe:
+            exec:
+              command:
+                - valkey-cli
+                - -a
+                - testpass
+                - ping
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command:
+                - valkey-cli
+                - -a
+                - testpass
+                - ping
+            initialDelaySeconds: 15
+            periodSeconds: 20
+      volumes:
+        - name: config
+          configMap:
+            name: valkey-config
+            items:
+              - key: master.conf
+                path: master.conf
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        storageClassName: devcc-board
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi

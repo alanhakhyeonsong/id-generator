@@ -1,0 +1,13 @@
+{{- if .Values.appConfig }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "id-generator.fullname" . }}-cm
+  namespace: {{ include "id-generator.namespace" . }}
+  labels:
+    {{- include "id-generator.labels" . | nindent 4 }}
+data:
+  {{- range $key, $value := .Values.appConfig }}
+  {{ $key }}: {{ $value | quote }}
+  {{- end }}
+{{- end }}
