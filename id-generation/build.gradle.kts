@@ -10,9 +10,8 @@ dependencies {
     implementation(project(":common-jpa"))
     implementation(project(":common-valkey"))
     implementation(project(":common-lock"))
+    implementation(project(":common-web"))
 
-    implementation("org.springframework.boot:spring-boot-starter-web")
-    implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.springframework.boot:spring-boot-starter-actuator")
 
     // database

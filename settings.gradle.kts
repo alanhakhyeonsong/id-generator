@@ -9,6 +9,7 @@ include(
     ":common-jpa",
     ":common-valkey",
     ":common-lock",
+    ":common-web",
     ":system-core",
 
     // service modules
@@ -19,3 +20,4 @@ include(
 project(":common-jpa").projectDir = file("core/common-jpa")
 project(":common-valkey").projectDir = file("core/common-valkey")
 project(":common-lock").projectDir = file("core/common-lock")
+project(":common-web").projectDir = file("core/common-web")

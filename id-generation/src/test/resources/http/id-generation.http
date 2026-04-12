@@ -1,0 +1,143 @@
+### ID Generation API Test
+### IntelliJ HTTP Client 기반 테스트 파일
+
+### ============================================
+### 1. 배치 ID 삽입 (100,000건 Base33 랜덤 값 사전 적재)
+### ============================================
+POST http://localhost:8080/api/v1/id-generation/batch
+Content-Type: application/json
+
+> {%
+    client.test("배치 ID 삽입 성공", function () {
+        client.assert(response.status === 200, "Status is 200");
+        client.assert(response.body.header.isSuccessful === true, "isSuccessful is true");
+    });
+%}
+
+### ============================================
+### 2. ID 타입 등록 - AGENT (AG)
+### ============================================
+POST http://localhost:8080/api/v1/id-generation/types/AG
+Content-Type: application/json
+
+> {%
+    client.test("AG 타입 등록 성공", function () {
+        client.assert(response.status === 200, "Status is 200");
+        client.assert(response.body.header.isSuccessful === true, "isSuccessful is true");
+    });
+%}
+
+### ============================================
+### 3. ID 타입 등록 - BACKUP (MB)
+### ============================================
+POST http://localhost:8080/api/v1/id-generation/types/MB
+Content-Type: application/json
+
+> {%
+    client.test("MB 타입 등록 성공", function () {
+        client.assert(response.status === 200, "Status is 200");
+        client.assert(response.body.header.isSuccessful === true, "isSuccessful is true");
+    });
+%}
+
+### ============================================
+### 4. ID 생성 - AGENT 타입
+### ============================================
+POST http://localhost:8080/api/v1/id-generation/AG
+Content-Type: application/json
+
+> {%
+    client.test("AG ID 생성 성공", function () {
+        client.assert(response.status === 200, "Status is 200");
+        client.assert(response.body.header.isSuccessful === true, "isSuccessful is true");
+        client.assert(response.body.data.startsWith("AG-"), "ID starts with AG-");
+        client.log("Generated ID: " + response.body.data);
+    });
+%}
+
+### ============================================
+### 5. ID 생성 - BACKUP 타입
+### ============================================
+POST http://localhost:8080/api/v1/id-generation/MB
+Content-Type: application/json
+
+> {%
+    client.test("MB ID 생성 성공", function () {
+        client.assert(response.status === 200, "Status is 200");
+        client.assert(response.body.header.isSuccessful === true, "isSuccessful is true");
+        client.assert(response.body.data.startsWith("MB-"), "ID starts with MB-");
+        client.log("Generated ID: " + response.body.data);
+    });
+%}
+
+### ============================================
+### 6. ID 연속 생성 (중복 없음 확인용)
+### ============================================
+POST http://localhost:8080/api/v1/id-generation/AG
+Content-Type: application/json
+
+> {%
+    client.test("AG ID 연속 생성", function () {
+        client.assert(response.status === 200, "Status is 200");
+        client.log("Generated ID: " + response.body.data);
+    });
+%}
+
+###
+POST http://localhost:8080/api/v1/id-generation/AG
+Content-Type: application/json
+
+> {%
+    client.test("AG ID 연속 생성 2", function () {
+        client.assert(response.status === 200, "Status is 200");
+        client.log("Generated ID: " + response.body.data);
+    });
+%}
+
+### ============================================
+### 7. 존재하지 않는 타입으로 ID 생성 (에러 케이스)
+### ============================================
+POST http://localhost:8080/api/v1/id-generation/XX
+Content-Type: application/json
+
+> {%
+    client.test("존재하지 않는 타입 - 에러 응답", function () {
+        client.assert(response.status !== 200, "Status is not 200");
+        client.assert(response.body.header.isSuccessful === false, "isSuccessful is false");
+        client.log("Error: " + response.body.header.message);
+    });
+%}
+
+### ============================================
+### 8. 잘못된 HTTP 메서드 (에러 케이스)
+### ============================================
+GET http://localhost:8080/api/v1/id-generation/AG
+
+> {%
+    client.test("GET 메서드 - 405 에러", function () {
+        client.assert(response.status === 405, "Status is 405");
+    });
+%}
+
+### ============================================
+### 9. 존재하지 않는 경로 (에러 케이스)
+### ============================================
+POST http://localhost:8080/api/v1/not-exists
+Content-Type: application/json
+
+> {%
+    client.test("존재하지 않는 경로 - 404 에러", function () {
+        client.assert(response.status === 404, "Status is 404");
+    });
+%}
+
+### ============================================
+### 10. Actuator Health Check
+### ============================================
+GET http://localhost:8080/actuator/health
+
+> {%
+    client.test("Health Check", function () {
+        client.assert(response.status === 200, "Status is 200");
+    });
+%}
