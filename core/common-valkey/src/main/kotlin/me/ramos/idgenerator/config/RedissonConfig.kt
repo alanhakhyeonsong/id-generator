@@ -60,12 +60,23 @@ class RedissonConfig {
         val sentinelConfig = config.useSentinelServers()
             .setMasterName(sentinel.master)
             .setCheckSentinelsList(false)
+            .setRetryAttempts(RETRY_ATTEMPTS)
+            .setRetryInterval(RETRY_INTERVAL_MS)
+            .setConnectTimeout(CONNECT_TIMEOUT_MS)
+            .setTimeout(COMMAND_TIMEOUT_MS)
 
         sentinel.nodes.forEach { node ->
             sentinelConfig.addSentinelAddress("redis://$node")
         }
 
         return sentinelConfig
+    }
+
+    companion object {
+        private const val RETRY_ATTEMPTS = 5
+        private const val RETRY_INTERVAL_MS = 2000
+        private const val CONNECT_TIMEOUT_MS = 5000
+        private const val COMMAND_TIMEOUT_MS = 3000
     }
 
     private fun applyPassword(sentinelConfig: SentinelServersConfig, redisProperties: RedisProperties) {

@@ -6,10 +6,13 @@ import io.swagger.v3.oas.annotations.tags.Tag
 import me.ramos.idgenerator.application.port.`in`.AddIdTypeInPort
 import me.ramos.idgenerator.application.port.`in`.BatchInsertIdInPort
 import me.ramos.idgenerator.application.port.`in`.GenerateIdInPort
+import me.ramos.idgenerator.application.port.`in`.InvalidateCacheInPort
 import me.ramos.idgenerator.web.dto.CommonResponse
+import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 
 /**
@@ -24,6 +27,7 @@ class IdGenerationRestController(
     private val generateIdInPort: GenerateIdInPort,
     private val batchInsertIdInPort: BatchInsertIdInPort,
     private val addIdTypeInPort: AddIdTypeInPort,
+    private val invalidateCacheInPort: InvalidateCacheInPort,
 ) {
 
     @PostMapping("/batch")
@@ -51,5 +55,16 @@ class IdGenerationRestController(
     ): CommonResponse<String?> {
         val id = generateIdInPort.execute(type)
         return CommonResponse.ok(id)
+    }
+
+    @DeleteMapping("/cache")
+    @Operation(summary = "캐시 무효화", description = "ID 생성기 시퀀스 캐시를 삭제한다. type 미지정 시 전체 삭제.")
+    fun invalidateCache(
+        @Parameter(description = "ID 타입 (미지정 시 전체 삭제)", example = "BACKUP")
+        @RequestParam(required = false) type: String?,
+    ): CommonResponse<String?> {
+        invalidateCacheInPort.execute(type)
+        val target = type ?: "전체"
+        return CommonResponse.ok("캐시 무효화 완료: $target")
     }
 }

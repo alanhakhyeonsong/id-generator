@@ -2,6 +2,7 @@ package me.ramos.idgenerator.application.service
 
 import io.github.oshai.kotlinlogging.KotlinLogging
 import me.ramos.idgenerator.application.exception.IdTypeNotFoundException
+import me.ramos.idgenerator.application.exception.LockAcquisitionFailedException
 import me.ramos.idgenerator.application.port.out.CacheIdGeneratorOutPort
 import me.ramos.idgenerator.application.port.out.LoadUsedIdOutPort
 import me.ramos.idgenerator.application.port.out.SaveUsedIdOutPort
@@ -58,13 +59,25 @@ class SegmentIdAllocator(
     }
 
     private fun allocateNewSegment(type: String): IdSegment {
-        return distributedLockManager.executeWithLock(
-            lockName = "ID-SEGMENT:$type",
-            waitTime = 10L,
-            leaseTime = 5L,
-            timeUnit = TimeUnit.SECONDS,
-            callback = LockCallback { doAllocateSegment(type) },
-        )
+        var lastException: Exception? = null
+        repeat(MAX_ALLOCATION_RETRY) { attempt ->
+            try {
+                return distributedLockManager.executeWithLock(
+                    lockName = "ID-SEGMENT:$type",
+                    waitTime = 10L,
+                    leaseTime = 5L,
+                    timeUnit = TimeUnit.SECONDS,
+                    callback = LockCallback { doAllocateSegment(type) },
+                )
+            } catch (e: Exception) {
+                lastException = e
+                log.warn { "블록 할당 실패 (attempt ${attempt + 1}/$MAX_ALLOCATION_RETRY): type=$type, error=${e.message}" }
+                if (attempt < MAX_ALLOCATION_RETRY - 1) {
+                    Thread.sleep(ALLOCATION_RETRY_DELAY_MS)
+                }
+            }
+        }
+        throw LockAcquisitionFailedException(type, lastException)
     }
 
     private fun doAllocateSegment(type: String): IdSegment {
@@ -103,5 +116,7 @@ class SegmentIdAllocator(
 
     companion object {
         const val BLOCK_SIZE = 1000L
+        private const val MAX_ALLOCATION_RETRY = 2
+        private const val ALLOCATION_RETRY_DELAY_MS = 1000L
     }
 }

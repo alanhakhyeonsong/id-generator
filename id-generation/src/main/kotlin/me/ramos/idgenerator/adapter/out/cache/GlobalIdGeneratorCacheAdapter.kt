@@ -18,15 +18,46 @@ class GlobalIdGeneratorCacheAdapter(
 
     override fun put(type: String, entity: UsedIdJpaEntity): UsedIdJpaEntity {
         val key = KEY_PREFIX + type
-        val json = objectMapper.writeValueAsString(entity)
-        redisTemplate.opsForValue().set(key, json)
-        log.debug { "스토리지 업데이트: key=$key" }
+        try {
+            val json = objectMapper.writeValueAsString(entity)
+            redisTemplate.opsForValue().set(key, json)
+            log.debug { "스토리지 업데이트: key=$key" }
+        } catch (e: Exception) {
+            log.warn(e) { "캐시 저장 실패 (무시): key=$key" }
+        }
         return entity
+    }
+
+    override fun evict(type: String) {
+        val key = KEY_PREFIX + type
+        try {
+            redisTemplate.delete(key)
+            log.info { "캐시 삭제: key=$key" }
+        } catch (e: Exception) {
+            log.warn(e) { "캐시 삭제 실패 (무시): key=$key" }
+        }
+    }
+
+    override fun evictAll() {
+        try {
+            val keys = redisTemplate.keys("$KEY_PREFIX*")
+            if (keys.isNotEmpty()) {
+                redisTemplate.delete(keys)
+                log.info { "캐시 전체 삭제: count=${keys.size}" }
+            }
+        } catch (e: Exception) {
+            log.warn(e) { "캐시 전체 삭제 실패 (무시)" }
+        }
     }
 
     override fun getOrLoad(type: String, loader: () -> UsedIdJpaEntity): UsedIdJpaEntity {
         val key = KEY_PREFIX + type
-        val cached = redisTemplate.opsForValue().get(key)
+        val cached = try {
+            redisTemplate.opsForValue().get(key)
+        } catch (e: Exception) {
+            log.warn(e) { "캐시 조회 실패, DB fallback: key=$key" }
+            null
+        }
 
         if (cached != null) {
             log.debug { "캐시 히트: key=$key" }
@@ -35,8 +66,12 @@ class GlobalIdGeneratorCacheAdapter(
 
         log.debug { "캐시 미스, DB에서 로드: key=$key" }
         val entity = loader()
-        val json = objectMapper.writeValueAsString(entity)
-        redisTemplate.opsForValue().set(key, json)
+        try {
+            val json = objectMapper.writeValueAsString(entity)
+            redisTemplate.opsForValue().set(key, json)
+        } catch (e: Exception) {
+            log.warn(e) { "캐시 저장 실패 (무시): key=$key" }
+        }
         return entity
     }
 }

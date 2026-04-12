@@ -13,4 +13,6 @@ import me.ramos.idgenerator.adapter.out.persistence.entity.UsedIdJpaEntity
 interface CacheIdGeneratorOutPort {
     fun put(type: String, entity: UsedIdJpaEntity): UsedIdJpaEntity
     fun getOrLoad(type: String, loader: () -> UsedIdJpaEntity): UsedIdJpaEntity
+    fun evict(type: String)
+    fun evictAll()
 }

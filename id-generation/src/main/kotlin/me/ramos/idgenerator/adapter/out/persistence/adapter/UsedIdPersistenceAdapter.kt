@@ -16,8 +16,8 @@ class UsedIdPersistenceAdapter(
     override fun findByType(type: String): UsedIdJpaEntity? =
         usedIdRepository.findByType(type)
 
-    override fun isIdGenerationRequired(type: String): Boolean =
-        usedIdRepository.isIdGenerationRequired(type)
+    override fun isIdGenerationRequired(totalRandomIdCount: Long?): Boolean =
+        usedIdRepository.isIdGenerationRequired(totalRandomIdCount)
 
     @Transactional
     override fun save(entity: UsedIdJpaEntity): UsedIdJpaEntity =
