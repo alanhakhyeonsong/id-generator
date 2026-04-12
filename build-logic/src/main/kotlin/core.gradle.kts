@@ -4,6 +4,12 @@ plugins {
     kotlin("plugin.spring")
 }
 
+the<io.spring.gradle.dependencymanagement.dsl.DependencyManagementExtension>().apply {
+    imports {
+        mavenBom("org.springframework.cloud:spring-cloud-dependencies:2025.0.0")
+    }
+}
+
 dependencies {
     "implementation"("org.jetbrains.kotlin:kotlin-stdlib")
     "implementation"("org.jetbrains.kotlin:kotlin-reflect")

@@ -3,7 +3,7 @@ package me.ramos.idgenerator.adapter.`in`.rest.controller
 import me.ramos.idgenerator.application.port.`in`.AddIdTypeInPort
 import me.ramos.idgenerator.application.port.`in`.BatchInsertIdInPort
 import me.ramos.idgenerator.application.port.`in`.GenerateIdInPort
-import org.springframework.http.ResponseEntity
+import me.ramos.idgenerator.web.dto.CommonResponse
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestMapping
@@ -23,20 +23,20 @@ class IdGenerationRestController(
 ) {
 
     @PostMapping("/batch")
-    fun batchInsertId(): ResponseEntity<String> {
+    fun batchInsertId(): CommonResponse<String?> {
         batchInsertIdInPort.execute()
-        return ResponseEntity.ok("배치 ID 삽입 완료")
+        return CommonResponse.ok("배치 ID 삽입 완료")
     }
 
     @PostMapping("/types/{type}")
-    fun addType(@PathVariable type: String): ResponseEntity<String> {
+    fun addType(@PathVariable type: String): CommonResponse<String?> {
         addIdTypeInPort.execute(type)
-        return ResponseEntity.ok("타입 추가 완료: $type")
+        return CommonResponse.ok("타입 추가 완료: $type")
     }
 
     @PostMapping("/{type}")
-    fun generateId(@PathVariable type: String): ResponseEntity<String> {
+    fun generateId(@PathVariable type: String): CommonResponse<String?> {
         val id = generateIdInPort.execute(type)
-        return ResponseEntity.ok(id)
+        return CommonResponse.ok(id)
     }
 }

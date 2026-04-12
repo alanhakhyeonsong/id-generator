@@ -2,6 +2,7 @@
 kotlin = "2.1.21"
 spring-boot = "3.5.4"
 spring-dependency-management = "1.1.7"
+spring-cloud = "2025.0.0"
 spring-data-commons = "3.5.2"
 
 # testing
