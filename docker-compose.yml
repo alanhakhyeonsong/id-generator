@@ -1,0 +1,105 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: id-gen-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: idgen
+      POSTGRES_USER: testuser
+      POSTGRES_PASSWORD: testpass
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U testuser -d idgen"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  valkey-master:
+    image: valkey/valkey:7
+    container_name: id-gen-valkey-master
+    ports:
+      - "6379:6379"
+    command: >
+      valkey-server
+      --requirepass testpass
+      --masterauth testpass
+    volumes:
+      - valkey-master-data:/data
+    healthcheck:
+      test: ["CMD", "valkey-cli", "-a", "testpass", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  valkey-replica-1:
+    image: valkey/valkey:7
+    container_name: id-gen-valkey-replica-1
+    ports:
+      - "6380:6379"
+    command: >
+      valkey-server
+      --replicaof valkey-master 6379
+      --requirepass testpass
+      --masterauth testpass
+    depends_on:
+      valkey-master:
+        condition: service_healthy
+
+  valkey-replica-2:
+    image: valkey/valkey:7
+    container_name: id-gen-valkey-replica-2
+    ports:
+      - "6381:6379"
+    command: >
+      valkey-server
+      --replicaof valkey-master 6379
+      --requirepass testpass
+      --masterauth testpass
+    depends_on:
+      valkey-master:
+        condition: service_healthy
+
+  valkey-sentinel-1:
+    image: valkey/valkey:7
+    container_name: id-gen-valkey-sentinel-1
+    ports:
+      - "26379:26379"
+    command: >
+      valkey-sentinel /etc/valkey/sentinel.conf
+    volumes:
+      - ./docker/valkey/sentinel.conf:/etc/valkey/sentinel.conf
+    depends_on:
+      valkey-master:
+        condition: service_healthy
+
+  valkey-sentinel-2:
+    image: valkey/valkey:7
+    container_name: id-gen-valkey-sentinel-2
+    ports:
+      - "26380:26379"
+    command: >
+      valkey-sentinel /etc/valkey/sentinel.conf
+    volumes:
+      - ./docker/valkey/sentinel.conf:/etc/valkey/sentinel.conf
+    depends_on:
+      valkey-master:
+        condition: service_healthy
+
+  valkey-sentinel-3:
+    image: valkey/valkey:7
+    container_name: id-gen-valkey-sentinel-3
+    ports:
+      - "26381:26379"
+    command: >
+      valkey-sentinel /etc/valkey/sentinel.conf
+    volumes:
+      - ./docker/valkey/sentinel.conf:/etc/valkey/sentinel.conf
+    depends_on:
+      valkey-master:
+        condition: service_healthy
+
+volumes:
+  postgres-data:
+  valkey-master-data:
