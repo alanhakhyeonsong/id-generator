@@ -8,5 +8,5 @@ package me.ramos.idgenerator.adapter.out.persistence.repository
 interface UsedIdRepositoryCustom {
     fun updateSequence(type: String, currentSeq: Long, count: Long): Long
     fun advanceToNextRange(type: String, seqIncrement: Long, endSeq: Long): Long
-    fun isIdGenerationRequired(type: String): Boolean
+    fun isIdGenerationRequired(totalRandomIdCount: Long?): Boolean
 }

@@ -2,6 +2,7 @@ package me.ramos.idgenerator.adapter.out.persistence.repository
 
 import com.querydsl.jpa.impl.JPAQueryFactory
 import me.ramos.idgenerator.adapter.out.persistence.entity.QUsedIdJpaEntity.usedIdJpaEntity
+import me.ramos.idgenerator.adapter.out.persistence.entity.UsedIdJpaEntity
 import org.springframework.stereotype.Repository
 
 /**
@@ -35,15 +36,18 @@ class UsedIdRepositoryImpl(
             .execute()
     }
 
-    override fun isIdGenerationRequired(type: String): Boolean {
-        return queryFactory
-            .select(
-                usedIdJpaEntity.count.goe(
-                    usedIdJpaEntity.capacity.multiply(0.9).longValue(),
-                ),
-            )
-            .from(usedIdJpaEntity)
-            .where(usedIdJpaEntity.type.eq(type))
-            .fetchOne() ?: false
+    override fun isIdGenerationRequired(totalRandomIdCount: Long?): Boolean {
+        if (totalRandomIdCount == null) return true
+
+        val capacity = UsedIdJpaEntity.DEFAULT_CAPACITY
+        val threshold = (capacity * 0.9).toLong()
+
+        val maxUsedId = queryFactory
+            .selectFrom(usedIdJpaEntity)
+            .orderBy(usedIdJpaEntity.seqRange.desc(), usedIdJpaEntity.count.desc())
+            .fetchFirst() ?: return true
+
+        val maxSeq = (maxUsedId.seqRange + 1).toLong() * capacity
+        return totalRandomIdCount == maxSeq && maxUsedId.count >= threshold
     }
 }

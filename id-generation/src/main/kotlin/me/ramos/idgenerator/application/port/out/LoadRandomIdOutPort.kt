@@ -10,4 +10,5 @@ import me.ramos.idgenerator.adapter.out.persistence.entity.RandomIdGeneratorJpaE
 interface LoadRandomIdOutPort {
     fun findById(seq: Long): RandomIdGeneratorJpaEntity?
     fun saveAll(entities: List<RandomIdGeneratorJpaEntity>): List<RandomIdGeneratorJpaEntity>
+    fun getMaxSequence(): Long?
 }

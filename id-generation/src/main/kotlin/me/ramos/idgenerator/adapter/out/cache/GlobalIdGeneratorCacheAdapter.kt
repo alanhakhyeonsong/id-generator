@@ -28,6 +28,28 @@ class GlobalIdGeneratorCacheAdapter(
         return entity
     }
 
+    override fun evict(type: String) {
+        val key = KEY_PREFIX + type
+        try {
+            redisTemplate.delete(key)
+            log.info { "캐시 삭제: key=$key" }
+        } catch (e: Exception) {
+            log.warn(e) { "캐시 삭제 실패 (무시): key=$key" }
+        }
+    }
+
+    override fun evictAll() {
+        try {
+            val keys = redisTemplate.keys("$KEY_PREFIX*")
+            if (keys.isNotEmpty()) {
+                redisTemplate.delete(keys)
+                log.info { "캐시 전체 삭제: count=${keys.size}" }
+            }
+        } catch (e: Exception) {
+            log.warn(e) { "캐시 전체 삭제 실패 (무시)" }
+        }
+    }
+
     override fun getOrLoad(type: String, loader: () -> UsedIdJpaEntity): UsedIdJpaEntity {
         val key = KEY_PREFIX + type
         val cached = try {
