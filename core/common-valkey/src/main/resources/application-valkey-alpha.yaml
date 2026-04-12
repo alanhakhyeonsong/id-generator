@@ -1,0 +1,7 @@
+spring:
+  data:
+    redis:
+      password: ${VALKEY_PASSWORD}
+      sentinel:
+        master: ${VALKEY_SENTINEL_MASTER:mymaster}
+        nodes: ${VALKEY_SENTINEL_NODES}
