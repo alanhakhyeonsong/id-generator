@@ -188,12 +188,61 @@ flowchart TD
 
 ---
 
+## 방어 코드 적용 후 재테스트 (시나리오 2 재실행)
+
+### 적용된 방어 코드
+
+| 변경 | 내용 |
+|------|------|
+| Redisson 설정 | retryAttempts=5, retryInterval=2s, connectTimeout=5s |
+| 캐시 어댑터 | Valkey 장애 시 DB fallback, 캐시 쓰기 실패 무시 |
+| SegmentIdAllocator | 블록 할당 retry (최대 2회, 1초 간격) |
+| 예외 처리 | LockAcquisitionFailedException → 503 Service Unavailable |
+
+### 테스트 조건
+
+- **실행 시각**: 2026-04-12 22:15 KST
+- **시나리오**: 50 VUs, 5분, In-Cluster
+- **Failover**: 테스트 시작 60초 후 `valkey-master-0` (현재 Master) 삭제
+
+### 결과 비교
+
+| 지표 | 방어 코드 적용 전 | 방어 코드 적용 후 |
+|------|-------------------|-------------------|
+| 총 요청 수 | 82,481 | **79,289** |
+| 성공 | 82,460 (99.97%) | **79,289 (100.00%)** |
+| **실패** | **21건 (0.02%)** | **0건 (0.00%)** |
+| 평균 응답시간 | 63ms | 71ms |
+| p(95) | 7.74ms | 10.12ms |
+| 최대 응답시간 | 10s | 14.42s |
+| 처리량 | 274.92 req/s | **264.29 req/s** |
+| Threshold | 모두 PASS | **모두 PASS** |
+
+### 분석
+
+- **실패 0건**: 방어 코드의 retry(최대 2회, 1초 간격)가 Failover 완료까지 대기하여 블록 할당 성공
+- **p(95) 소폭 증가** (7.74ms → 10.12ms): retry 대기 시간이 포함된 블록 할당 요청의 영향
+- **max 14.42s**: Failover 중 블록 할당 retry 포함 최대 응답시간 (극소수 요청)
+- **처리량 유지**: 264 req/s로 방어 코드 적용 전 대비 96% 수준 유지
+
+### 결론
+
+> **방어 코드 적용으로 Master Failover를 앱 레벨에서 완전히 투명하게 처리.**
+>
+> - Segment 블록: Failover 중 99.9% 요청을 Valkey 무관하게 처리
+> - 블록 할당 retry: 나머지 0.1% 요청도 Failover 완료 후 자동 복구
+> - 캐시 graceful degradation: Valkey 연결 실패 시 DB fallback으로 서비스 지속
+>
+> 50 VUs 부하 중 Master Failover 발생 시 **실패율 0%, 처리량 264 req/s** 달성.
+
+---
+
 ## 메타 정보
 
 | 항목 | 값 |
 |------|-----|
-| 테스트 일시 | 2026-04-12 21:13~21:21 KST |
+| 테스트 일시 | 2026-04-12 21:13~22:21 KST |
 | 실행자 | Claude Code |
-| 앱 버전 | Segment 블록 할당 적용 (Phase 1 + Phase 2) |
+| 앱 버전 | Segment 블록 할당 + 방어 코드 적용 |
 | Valkey 버전 | 7.x (Sentinel 모드) |
 | Redisson 버전 | 3.52.0 |
