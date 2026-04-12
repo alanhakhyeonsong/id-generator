@@ -16,9 +16,6 @@ class UsedIdPersistenceAdapter(
     override fun findByType(type: String): UsedIdJpaEntity? =
         usedIdRepository.findByType(type)
 
-    override fun findByTypeWithLock(type: String): UsedIdJpaEntity? =
-        usedIdRepository.findByTypeWithLock(type)
-
     override fun isIdGenerationRequired(type: String): Boolean =
         usedIdRepository.isIdGenerationRequired(type)
 

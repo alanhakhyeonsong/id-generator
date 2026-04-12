@@ -1,18 +1,12 @@
 package me.ramos.idgenerator.adapter.out.persistence.repository
 
-import jakarta.persistence.LockModeType
 import me.ramos.idgenerator.adapter.out.persistence.entity.UsedIdJpaEntity
 import org.springframework.data.jpa.repository.JpaRepository
-import org.springframework.data.jpa.repository.Lock
 import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
 
 interface UsedIdRepository : JpaRepository<UsedIdJpaEntity, Long> {
-
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("SELECT u FROM UsedIdJpaEntity u WHERE u.type = :type")
-    fun findByTypeWithLock(@Param("type") type: String): UsedIdJpaEntity?
 
     fun findByType(type: String): UsedIdJpaEntity?
 
