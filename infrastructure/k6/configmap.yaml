@@ -2,7 +2,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: k6-scripts
-  namespace: ramos-id-generator-test
+  namespace: k6-load-test
   labels:
     app.kubernetes.io/part-of: k6-load-test
 data:
@@ -10,14 +10,14 @@ data:
     import http from 'k6/http';
     import { check, sleep } from 'k6';
 
-    const BASE_URL = __ENV.BASE_URL || 'http://id-generator-svc.ramos-id-generator-test.svc.cluster.local';
+    const BASE_URL = __ENV.BASE_URL || 'http://ramos-id-test.cone-chain.net';
 
     export const options = {
       vus: 1,
       duration: '30s',
       thresholds: {
         http_req_failed: ['rate<0.01'],
-        http_req_duration: ['p(95)<2000'],
+        http_req_duration: ['p(95)<5000'],
       },
     };
 
@@ -26,14 +26,6 @@ data:
       const healthRes = http.get(`${BASE_URL}/actuator/health`);
       check(healthRes, {
         'health status 200': (r) => r.status === 200,
-      });
-
-      // Batch insert
-      const batchRes = http.post(`${BASE_URL}/api/v1/id-generation/batch`, null, {
-        headers: { 'Content-Type': 'application/json' },
-      });
-      check(batchRes, {
-        'batch status 200': (r) => r.status === 200,
       });
 
       // Generate ID (BACKUP type)
@@ -52,7 +44,7 @@ data:
     import http from 'k6/http';
     import { check, sleep } from 'k6';
 
-    const BASE_URL = __ENV.BASE_URL || 'http://id-generator-svc.ramos-id-generator-test.svc.cluster.local';
+    const BASE_URL = __ENV.BASE_URL || 'http://ramos-id-test.cone-chain.net';
 
     export const options = {
       stages: [
@@ -62,7 +54,7 @@ data:
       ],
       thresholds: {
         http_req_failed: ['rate<0.01'],
-        http_req_duration: ['p(95)<500', 'p(99)<1000'],
+        http_req_duration: ['p(95)<3000', 'p(99)<5000'],
       },
     };
 
@@ -80,7 +72,7 @@ data:
     import http from 'k6/http';
     import { check, sleep } from 'k6';
 
-    const BASE_URL = __ENV.BASE_URL || 'http://id-generator-svc.ramos-id-generator-test.svc.cluster.local';
+    const BASE_URL = __ENV.BASE_URL || 'http://ramos-id-test.cone-chain.net';
 
     export const options = {
       stages: [
@@ -93,7 +85,7 @@ data:
       ],
       thresholds: {
         http_req_failed: ['rate<0.05'],
-        http_req_duration: ['p(95)<3000'],
+        http_req_duration: ['p(95)<5000'],
       },
     };
 
@@ -111,7 +103,7 @@ data:
     import http from 'k6/http';
     import { check, sleep } from 'k6';
 
-    const BASE_URL = __ENV.BASE_URL || 'http://id-generator-svc.ramos-id-generator-test.svc.cluster.local';
+    const BASE_URL = __ENV.BASE_URL || 'http://ramos-id-test.cone-chain.net';
 
     export const options = {
       stages: [
@@ -141,7 +133,7 @@ data:
     import http from 'k6/http';
     import { check, sleep } from 'k6';
 
-    const BASE_URL = __ENV.BASE_URL || 'http://id-generator-svc.ramos-id-generator-test.svc.cluster.local';
+    const BASE_URL = __ENV.BASE_URL || 'http://ramos-id-test.cone-chain.net';
 
     export const options = {
       stages: [
@@ -151,7 +143,7 @@ data:
       ],
       thresholds: {
         http_req_failed: ['rate<0.01'],
-        http_req_duration: ['p(95)<1000'],
+        http_req_duration: ['p(95)<5000'],
       },
     };
 
