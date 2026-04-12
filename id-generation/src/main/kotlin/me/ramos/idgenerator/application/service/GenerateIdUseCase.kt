@@ -2,6 +2,7 @@ package me.ramos.idgenerator.application.service
 
 import io.github.oshai.kotlinlogging.KotlinLogging
 import me.ramos.idgenerator.application.exception.IdExhaustedException
+import me.ramos.idgenerator.application.exception.IdTypeNotFoundException
 import me.ramos.idgenerator.application.port.`in`.GenerateIdInPort
 import me.ramos.idgenerator.application.port.out.CacheIdGeneratorOutPort
 import me.ramos.idgenerator.application.port.out.LoadRandomIdOutPort
@@ -37,7 +38,7 @@ class GenerateIdUseCase(
     private fun doGenerateId(type: String): String {
         val entity = cacheOutPort.getOrLoad(type) {
             loadUsedIdOutPort.findByTypeWithLock(type)
-                ?: throw IllegalStateException("ID 타입이 존재하지 않습니다: type=$type")
+                ?: throw IdTypeNotFoundException(type)
         }
 
         val typeInfo = UsedIdTypeInfo(entity)
