@@ -53,7 +53,7 @@ class SegmentIdAllocatorTest : BehaviorSpec({
         )
 
         every { cacheOutPort.getOrLoad(type, any()) } returns entity
-        every { saveUsedIdOutPort.updateSequence(type, any(), any()) } returns 1
+        every { saveUsedIdOutPort.updateSequence(type, any(), any()) } returns 1L
         every { cacheOutPort.put(type, entity) } returns entity
 
         When("시퀀스를 요청하면") {
