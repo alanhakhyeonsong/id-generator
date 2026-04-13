@@ -1,0 +1,53 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "valkey.fullname" . }}-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "valkey.labels" . | nindent 4 }}
+data:
+  valkey.conf: |
+    port 6379
+    requirepass PLACEHOLDER_PASSWORD
+    masterauth PLACEHOLDER_PASSWORD
+    {{- range $key, $val := .Values.data.config }}
+    {{ $key }} {{ $val }}
+    {{- end }}
+
+  sentinel.conf: |
+    port 26379
+    sentinel resolve-hostnames yes
+    sentinel announce-hostnames yes
+    sentinel monitor {{ .Values.sentinel.masterName }} {{ include "valkey.initialMaster.fqdn" . }} 6379 {{ .Values.sentinel.config.quorum }}
+    sentinel auth-pass {{ .Values.sentinel.masterName }} PLACEHOLDER_PASSWORD
+    sentinel down-after-milliseconds {{ .Values.sentinel.masterName }} {{ .Values.sentinel.config.downAfterMilliseconds }}
+    sentinel failover-timeout {{ .Values.sentinel.masterName }} {{ .Values.sentinel.config.failoverTimeout }}
+    sentinel parallel-syncs {{ .Values.sentinel.masterName }} {{ .Values.sentinel.config.parallelSyncs }}
+
+  # 초기 Replica 설정 스크립트 (Pod ordinal >= 1 인 경우 REPLICAOF 실행)
+  init-replica.sh: |
+    #!/bin/sh
+    set -e
+
+    ORDINAL=$(echo "$HOSTNAME" | grep -o '[0-9]*$')
+    MASTER_FQDN="{{ include "valkey.initialMaster.fqdn" . }}"
+
+    if [ "$ORDINAL" != "0" ]; then
+      echo "Pod ordinal=$ORDINAL → Replica로 시작. Master=$MASTER_FQDN"
+
+      # Master가 준비될 때까지 대기 (최대 60초)
+      for i in $(seq 1 30); do
+        if valkey-cli -h "$MASTER_FQDN" -a "$VALKEY_PASSWORD" ping 2>/dev/null | grep -q PONG; then
+          echo "Master 응답 확인"
+          break
+        fi
+        echo "Master 대기 중... ($i/30)"
+        sleep 2
+      done
+
+      # REPLICAOF 설정
+      valkey-cli -a "$VALKEY_PASSWORD" REPLICAOF "$MASTER_FQDN" 6379
+      echo "REPLICAOF 설정 완료"
+    else
+      echo "Pod ordinal=0 → Master로 시작"
+    fi

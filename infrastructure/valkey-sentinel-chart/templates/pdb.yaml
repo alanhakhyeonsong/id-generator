@@ -1,0 +1,31 @@
+{{- if .Values.data.pdb.enabled }}
+# Data Node PDB — 최소 2개 유지 (Failover 안전 마진)
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "valkey.fullname" . }}-data-pdb
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "valkey.labels" . | nindent 4 }}
+spec:
+  minAvailable: {{ .Values.data.pdb.minAvailable }}
+  selector:
+    matchLabels:
+      {{- include "valkey.data.selectorLabels" . | nindent 6 }}
+{{- end }}
+---
+{{- if .Values.sentinel.pdb.enabled }}
+# Sentinel PDB — quorum 보장 (최소 2개 유지)
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "valkey.fullname" . }}-sentinel-pdb
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "valkey.labels" . | nindent 4 }}
+spec:
+  minAvailable: {{ .Values.sentinel.pdb.minAvailable }}
+  selector:
+    matchLabels:
+      {{- include "valkey.sentinel.selectorLabels" . | nindent 6 }}
+{{- end }}
