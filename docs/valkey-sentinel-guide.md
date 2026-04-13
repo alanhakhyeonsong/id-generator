@@ -285,49 +285,131 @@ flowchart TD
 
 ## K8s 환경 Valkey Sentinel 운영
 
-### 본 프로젝트 구성
+### 본 프로젝트 구성 — 단일 StatefulSet (Helm Chart)
 
-| 컴포넌트 | 타입 | Replicas | 비고 |
-|----------|------|----------|------|
-| Master | StatefulSet | 1 | PVC 1Gi |
-| Replica | StatefulSet | 2 | PVC 1Gi |
-| Sentinel | Deployment | 3 | initContainer로 config 복사 |
+dev cluster에서 Master/Replica를 별도 StatefulSet으로 분리 배포한 초기 구성을 테스트한 결과,
+**역할 역전(Failover 후 K8s Service 라우팅 불일치)** 이슈가 확인되었다.
+이를 해결하기 위해 **단일 StatefulSet + Sentinel Deployment** 구조로 전환하였다.
+
+> Helm Chart: `infrastructure/valkey-sentinel-chart/`
+> 사내 표준 Chart: [valkey-sentinel-chart](https://github.nhnent.com/inje/valkey-sentinel-chart)
+
+```mermaid
+flowchart TD
+    subgraph ns["ramos-id-generator-test"]
+        subgraph data["StatefulSet: valkey (replicas: 3)"]
+            V0["valkey-0 — Master"]
+            V1["valkey-1 — Replica"]
+            V2["valkey-2 — Replica"]
+            V0 -->|비동기 복제| V1 & V2
+        end
+
+        subgraph sent["Deployment: valkey-sentinel (replicas: 3)"]
+            S0[sentinel-0]
+            S1[sentinel-1]
+            S2[sentinel-2]
+        end
+
+        S0 & S1 & S2 -.->|"모니터링 + failover"| V0 & V1 & V2
+        APP["id-generator Pod"] -->|"Sentinel 프로토콜"| S0 & S1 & S2
+    end
+```
+
+| 컴포넌트 | K8s 리소스 | Replicas | 비고 |
+|----------|-----------|----------|------|
+| Data Node | StatefulSet + PVC | 3 | Sentinel이 역할 관리 (Master/Replica 자동) |
+| Sentinel | Deployment | 3 | initContainer로 config를 emptyDir에 복사 |
+| Data PDB | PodDisruptionBudget | - | minAvailable: 2 |
+| Sentinel PDB | PodDisruptionBudget | - | minAvailable: 2 (quorum 보장) |
+
+### 배포/관리
+
+```bash
+# 배포
+helm install valkey ./infrastructure/valkey-sentinel-chart \
+  -n ramos-id-generator-test \
+  -f infrastructure/valkey-sentinel-chart/values-dev.yaml \
+  --set auth.password=<password>
+
+# 업그레이드
+helm upgrade valkey ./infrastructure/valkey-sentinel-chart \
+  -n ramos-id-generator-test \
+  -f infrastructure/valkey-sentinel-chart/values-dev.yaml \
+  --set auth.password=<password>
+
+# 삭제
+helm uninstall valkey -n ramos-id-generator-test
+kubectl delete pvc -l app.kubernetes.io/name=valkey -n ramos-id-generator-test
+```
 
 ### K8s 특수 고려사항
 
-1. **DNS 해석**: `sentinel resolve-hostnames yes` 필수 (K8s Service 이름 사용)
-2. **Sentinel config rewrite**: Sentinel은 config를 런타임에 수정하므로 `initContainer`로 ConfigMap → emptyDir 복사
-3. **Pod 재생성**: StatefulSet/Deployment가 삭제된 Pod를 자동 복구
-4. **Headless Service**: Sentinel은 `clusterIP: None`으로 설정하여 개별 Pod DNS 사용
+| 항목 | 설명 |
+|------|------|
+| **단일 StatefulSet** | Master/Replica를 분리하지 않음. Sentinel이 역할 관리하므로 Failover 후 Service 불일치 원천 차단 |
+| **DNS 해석** | `sentinel resolve-hostnames yes` 필수 (K8s Service 이름 사용) |
+| **Config rewrite** | Sentinel은 config를 런타임에 수정하므로 initContainer로 ConfigMap → emptyDir 복사 |
+| **Headless Service** | Data Node + Sentinel 모두 `clusterIP: None`으로 개별 Pod DNS 사용 |
+| **PDB** | Sentinel minAvailable: 2 (quorum 보장), Data minAvailable: 2 |
+| **AntiAffinity** | Sentinel: `required` (노드 분산 필수), Data: `preferred` |
+| **maxmemory** | 192mb (컨테이너 limits 256Mi의 75%). OOM Kill 방어 |
+| **이미지 태그** | `valkey/valkey:7.2.8` 고정 (재현성 확보) |
 
 ### Failover 시 주의사항
 
 | 상황 | 대응 |
 |------|------|
 | Master Pod 재시작 | StatefulSet이 동일 PVC로 재생성 → 데이터 보존 |
-| Failover 후 역할 변경 | 기존 Master가 Replica로 복귀 → 수동 개입 불필요 |
+| Failover 후 역할 변경 | Sentinel이 구 Master를 Replica로 재구성 → 수동 개입 불필요 |
 | Sentinel 쿼럼 상실 | Deployment가 Pod 복구 → 자동 쿼럼 회복 |
 | 네트워크 파티션 | Sentinel 쿼럼이 있는 쪽이 Failover 주도 |
+| Stale Sentinel 엔트리 | `SENTINEL RESET mymaster`로 정리 |
 
 ---
 
 ## 운영 명령어
 
 ```bash
-# Master 확인
-kubectl exec valkey-sentinel-xxx -- valkey-cli -p 26379 SENTINEL get-master-addr-by-name mymaster
+NS=ramos-id-generator-test
 
-# Sentinel 상태
-kubectl exec valkey-sentinel-xxx -- valkey-cli -p 26379 SENTINEL masters
+# ── 토폴로지 확인 ──
+# Master 주소 조회
+kubectl exec deploy/valkey-sentinel -n $NS -- \
+  valkey-cli -p 26379 SENTINEL get-master-addr-by-name mymaster
 
-# 수동 Failover
-kubectl exec valkey-sentinel-xxx -- valkey-cli -p 26379 SENTINEL failover mymaster
+# Replica 목록
+kubectl exec deploy/valkey-sentinel -n $NS -- \
+  valkey-cli -p 26379 SENTINEL replicas mymaster
 
+# Sentinel 목록 (stale 엔트리 확인)
+kubectl exec deploy/valkey-sentinel -n $NS -- \
+  valkey-cli -p 26379 SENTINEL sentinels mymaster
+
+# ── 상태 점검 ──
 # Replication 상태
-kubectl exec valkey-master-0 -- valkey-cli -a testpass INFO replication
+kubectl exec valkey-0 -n $NS -- \
+  sh -c 'valkey-cli -a $VALKEY_PASSWORD INFO replication'
+
+# 메모리 사용량
+kubectl exec valkey-0 -n $NS -- \
+  sh -c 'valkey-cli -a $VALKEY_PASSWORD INFO memory'
 
 # 연결된 클라이언트 수
-kubectl exec valkey-master-0 -- valkey-cli -a testpass INFO clients
+kubectl exec valkey-0 -n $NS -- \
+  sh -c 'valkey-cli -a $VALKEY_PASSWORD INFO clients'
+
+# 슬로우 쿼리
+kubectl exec valkey-0 -n $NS -- \
+  sh -c 'valkey-cli -a $VALKEY_PASSWORD SLOWLOG GET 10'
+
+# ── 계획된 점검 ──
+# 수동 Failover (graceful)
+kubectl exec deploy/valkey-sentinel -n $NS -- \
+  valkey-cli -p 26379 SENTINEL FAILOVER mymaster
+
+# Stale 엔트리 정리
+kubectl exec deploy/valkey-sentinel -n $NS -- \
+  valkey-cli -p 26379 SENTINEL RESET mymaster
 ```
 
 ---
@@ -338,4 +420,7 @@ kubectl exec valkey-master-0 -- valkey-cli -a testpass INFO clients
 - [Redis Sentinel 공식 문서](https://redis.io/docs/management/sentinel/)
 - [Redisson GitHub](https://github.com/redisson/redisson)
 - [Redisson Sentinel Config](https://github.com/redisson/redisson/wiki/2.-Configuration#sentinel-mode)
+- [사내 표준 Valkey Sentinel Chart](https://github.nhnent.com/inje/valkey-sentinel-chart)
+- 프로젝트 Helm Chart: `infrastructure/valkey-sentinel-chart/`
 - 프로젝트 테스트 리포트: `docs/load-test-report/`
+- 분산 락 Failover 분석: `docs/analysis/distributed-lock-failover-analysis.md`
