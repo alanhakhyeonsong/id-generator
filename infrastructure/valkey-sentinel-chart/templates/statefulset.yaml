@@ -1,0 +1,140 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "valkey.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "valkey.labels" . | nindent 4 }}
+    app.kubernetes.io/component: data
+spec:
+  serviceName: {{ include "valkey.fullname" . }}-headless
+  replicas: {{ .Values.data.replicas }}
+  selector:
+    matchLabels:
+      {{- include "valkey.data.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "valkey.labels" . | nindent 8 }}
+        {{- include "valkey.data.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.data.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      initContainers:
+        # ConfigMap의 valkey.conf를 emptyDir에 복사하고, 비밀번호를 치환
+        - name: init-config
+          image: {{ .Values.global.image.repository }}:{{ .Values.global.image.tag }}
+          command:
+            - sh
+            - -c
+            - |
+              cp /etc/valkey-ro/valkey.conf /etc/valkey/valkey.conf
+              sed -i "s/PLACEHOLDER_PASSWORD/$VALKEY_PASSWORD/g" /etc/valkey/valkey.conf
+          env:
+            - name: VALKEY_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ default (printf "%s-secret" (include "valkey.fullname" .)) .Values.auth.existingSecret }}
+                  key: {{ .Values.auth.secretKey }}
+          volumeMounts:
+            - name: config-ro
+              mountPath: /etc/valkey-ro
+              readOnly: true
+            - name: config
+              mountPath: /etc/valkey
+      containers:
+        - name: valkey
+          image: {{ .Values.global.image.repository }}:{{ .Values.global.image.tag }}
+          imagePullPolicy: {{ .Values.global.image.pullPolicy }}
+          ports:
+            - containerPort: 6379
+              name: valkey
+          command:
+            - valkey-server
+            - /etc/valkey/valkey.conf
+          env:
+            - name: VALKEY_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ default (printf "%s-secret" (include "valkey.fullname" .)) .Values.auth.existingSecret }}
+                  key: {{ .Values.auth.secretKey }}
+          volumeMounts:
+            - name: config
+              mountPath: /etc/valkey
+            - name: data
+              mountPath: /data
+            - name: init-scripts
+              mountPath: /scripts
+              readOnly: true
+          resources:
+            {{- toYaml .Values.data.resources | nindent 12 }}
+          # 기동 후 Replica 역할 자동 설정 (ordinal >= 1)
+          lifecycle:
+            postStart:
+              exec:
+                command:
+                  - sh
+                  - /scripts/init-replica.sh
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - "valkey-cli -a $VALKEY_PASSWORD ping | grep -q PONG"
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - "valkey-cli -a $VALKEY_PASSWORD ping | grep -q PONG"
+            initialDelaySeconds: 15
+            periodSeconds: 20
+        {{- if .Values.metrics.enabled }}
+        - name: exporter
+          image: {{ .Values.metrics.image.repository }}:{{ .Values.metrics.image.tag }}
+          ports:
+            - containerPort: 9121
+              name: metrics
+          env:
+            - name: REDIS_ADDR
+              value: "redis://localhost:6379"
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ default (printf "%s-secret" (include "valkey.fullname" .)) .Values.auth.existingSecret }}
+                  key: {{ .Values.auth.secretKey }}
+          resources:
+            {{- toYaml .Values.metrics.resources | nindent 12 }}
+        {{- end }}
+      volumes:
+        - name: config-ro
+          configMap:
+            name: {{ include "valkey.fullname" . }}-config
+            items:
+              - key: valkey.conf
+                path: valkey.conf
+        - name: config
+          emptyDir: {}
+        - name: init-scripts
+          configMap:
+            name: {{ include "valkey.fullname" . }}-config
+            items:
+              - key: init-replica.sh
+                path: init-replica.sh
+            defaultMode: 0755
+  {{- if .Values.data.persistence.enabled }}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        storageClassName: {{ .Values.data.persistence.storageClass }}
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: {{ .Values.data.persistence.size }}
+  {{- end }}

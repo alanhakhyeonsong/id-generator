@@ -1,0 +1,88 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "valkey.fullname" . }}-sentinel
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "valkey.labels" . | nindent 4 }}
+    app.kubernetes.io/component: sentinel
+spec:
+  replicas: {{ .Values.sentinel.replicas }}
+  selector:
+    matchLabels:
+      {{- include "valkey.sentinel.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "valkey.labels" . | nindent 8 }}
+        {{- include "valkey.sentinel.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.sentinel.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      initContainers:
+        # ConfigMap → emptyDir 복사 (Sentinel은 런타임에 config를 rewrite함)
+        # 동시에 비밀번호 치환
+        - name: copy-config
+          image: {{ .Values.global.image.repository }}:{{ .Values.global.image.tag }}
+          command:
+            - sh
+            - -c
+            - |
+              cp /etc/valkey-ro/sentinel.conf /etc/valkey/sentinel.conf
+              sed -i "s/PLACEHOLDER_PASSWORD/$VALKEY_PASSWORD/g" /etc/valkey/sentinel.conf
+          env:
+            - name: VALKEY_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ default (printf "%s-secret" (include "valkey.fullname" .)) .Values.auth.existingSecret }}
+                  key: {{ .Values.auth.secretKey }}
+          volumeMounts:
+            - name: config-ro
+              mountPath: /etc/valkey-ro
+              readOnly: true
+            - name: config
+              mountPath: /etc/valkey
+      containers:
+        - name: sentinel
+          image: {{ .Values.global.image.repository }}:{{ .Values.global.image.tag }}
+          imagePullPolicy: {{ .Values.global.image.pullPolicy }}
+          ports:
+            - containerPort: 26379
+              name: sentinel
+          command:
+            - valkey-sentinel
+            - /etc/valkey/sentinel.conf
+          volumeMounts:
+            - name: config
+              mountPath: /etc/valkey
+          resources:
+            {{- toYaml .Values.sentinel.resources | nindent 12 }}
+          readinessProbe:
+            exec:
+              command:
+                - valkey-cli
+                - -p
+                - "26379"
+                - ping
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command:
+                - valkey-cli
+                - -p
+                - "26379"
+                - ping
+            initialDelaySeconds: 15
+            periodSeconds: 20
+      volumes:
+        - name: config-ro
+          configMap:
+            name: {{ include "valkey.fullname" . }}-config
+            items:
+              - key: sentinel.conf
+                path: sentinel.conf
+        - name: config
+          emptyDir: {}

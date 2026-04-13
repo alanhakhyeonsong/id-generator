@@ -1,0 +1,43 @@
+# ─── dev cluster (nks_ccp-dev) 오버라이드 ───
+# 배포: helm install valkey ./valkey-sentinel-chart -n ramos-id-generator-test -f valkey-sentinel-chart/values-dev.yaml --set auth.password=testpass
+
+# id-generator 프로젝트 전용 설정
+data:
+  replicas: 3
+  persistence:
+    storageClass: "devcc-board"
+    size: 1Gi
+  config:
+    maxmemory: "192mb"
+    maxmemory-policy: "allkeys-lru"
+    appendonly: "yes"
+    appendfsync: "everysec"
+    min-replicas-to-write: "1"
+    min-replicas-max-lag: "10"
+    slowlog-log-slower-than: "10000"
+    slowlog-max-len: "128"
+  # dev 노드 4개 → preferred로 충분
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchLabels:
+                app.kubernetes.io/component: data
+            topologyKey: kubernetes.io/hostname
+
+sentinel:
+  config:
+    downAfterMilliseconds: 5000
+    failoverTimeout: 10000
+    parallelSyncs: 1
+    quorum: 2
+  # dev 노드 4개 → required 가능
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchLabels:
+              app.kubernetes.io/component: sentinel
+          topologyKey: kubernetes.io/hostname
